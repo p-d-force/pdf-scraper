@@ -1,0 +1,106 @@
+# Learned Scraping Strategies
+# Accumulates patterns that worked (and failed) across all scraping operations.
+# The CLI uses this to suggest approaches for new pages.
+
+- strategy_name: "Apptegy CDN direct PDF download"
+  platform_type: "apptegy"
+  pattern_type: "url_pattern"
+  pattern_value: "https://files-backend.assets.thrillshare.com/{uuid}/document.pdf"
+  success_count: 5
+  fail_count: 0
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://files-backend.assets.thrillshare.com/abc123/document.pdf"
+  notes: "Apptegy hosts actual PDFs on Thrillshare CDN with UUID paths. The listing page uses JS navigation. Scrape the listing page for UUIDs, then construct CDN URLs."
+  is_active: true
+
+- strategy_name: "Apptegy subdomain detection"
+  platform_type: "apptegy"
+  pattern_type: "url_pattern"
+  pattern_value: "*.apptegy.net"
+  success_count: 8
+  fail_count: 1
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://attleboroschools.apptegy.net/"
+  notes: "Most MA districts using Apptegy have a subdomain on apptegy.net. Check page source for 'thrillshare' references to confirm."
+  is_active: true
+
+- strategy_name: "CivicEngage Agenda Center JS navigation"
+  platform_type: "civicengage"
+  pattern_type: "navigation_flow"
+  pattern_value: "Call changeYear() on the page to navigate between years, then extract PDF links from the resulting table."
+  success_count: 3
+  fail_count: 0
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://www.cityofattleboro.us/AgendaCenter/"
+  notes: "CivicEngage agenda centers use JavaScript year navigation. Use Selenium or Playwright to call changeYear(), then scrape the table rows."
+  is_active: true
+
+- strategy_name: "CivicEngage PDF link pattern"
+  platform_type: "civicengage"
+  pattern_type: "dom_selector"
+  pattern_value: "a[href$='.pdf'] within table.agendaTable or div.agendaList"
+  success_count: 3
+  fail_count: 0
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://www.cityofattleboro.us/AgendaCenter/"
+  notes: "PDF links are straightforward <a> tags with .pdf extension. Meeting dates can be extracted from link text or adjacent table cells."
+  is_active: true
+
+- strategy_name: "DESE Socrata API"
+  platform_type: "government_portal"
+  pattern_type: "api_endpoint"
+  pattern_value: "https://educationdata.mass.gov/resource/{dataset_id}.json"
+  success_count: 2
+  fail_count: 0
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://educationdata.mass.gov/resource/restraint-data.json"
+  notes: "DESE exposes data via Socrata (educationdata.mass.gov). Use SODA API with $limit, $offset, $where parameters. Token may be needed for large exports."
+  is_active: true
+
+- strategy_name: "DESE Profiles HTML table parsing"
+  platform_type: "government_portal"
+  pattern_type: "dom_selector"
+  pattern_value: "table with class containing 'grid' or 'datatable'"
+  success_count: 4
+  fail_count: 1
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://profiles.doe.mass.edu/statereport/restraints.aspx"
+  notes: "DESE Profiles uses ASP.NET grid views. Parse with HTMLParser or BeautifulSoup. Watch for suppressed cells marked with dash (-)."
+  is_active: true
+
+- strategy_name: "YouTube district channel"
+  platform_type: "video_platform"
+  pattern_type: "url_pattern"
+  pattern_value: "https://www.youtube.com/@{handle}/playlists"
+  success_count: 2
+  fail_count: 0
+  last_used: "2026-07-14"
+  last_success: "2026-07-14"
+  example_urls:
+    - "https://www.youtube.com/@attleboroschools/playlists"
+  notes: "District meeting channels often have playlists by year. Use yt-dlp for download, or just track URLs + subtitles."
+  is_active: true
+
+- strategy_name: "BoardDocs meeting portal"
+  platform_type: "boarddocs"
+  pattern_type: "url_pattern"
+  pattern_value: "https://go.boarddocs.com/{state}/{district}/Board.nsf/Public"
+  success_count: 0
+  fail_count: 1
+  last_used: "2026-07-14"
+  last_success: null
+  example_urls: []
+  notes: "BoardDocs uses a complex JavaScript SPA. May require Playwright with careful wait strategies. Not yet successfully scraped."
+  is_active: true
