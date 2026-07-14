@@ -98,12 +98,10 @@ class BaseScraper(ABC):
         self._rate_limit_wait()
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
-        # Sanitize filename
         safe_name = "".join(c for c in filename if c.isalnum() or c in "._- ")
         safe_name = safe_name.strip()[:200]
         dest = self.download_dir / safe_name
 
-        # Avoid overwriting
         if dest.exists():
             stem, ext = dest.stem, dest.suffix
             dest = self.download_dir / f"{stem}_{int(time.time())}{ext}"
@@ -117,6 +115,53 @@ class BaseScraper(ABC):
 
         return dest
 
+    # -- Pipeline integration -------------------------------------------
+
+    def process_results(self, result: ScrapeResult, download: bool = True,
+                        subdir: str = "") -> ScrapeResult:
+        """Feed discovered documents through the download pipeline.
+
+        When download=True (default), discovered documents are automatically
+        downloaded, verified, deduped, and saved to the documents database.
+        Call this at the end of your run() method.
+
+        Returns the result with document statuses updated (downloaded/failed/etc).
+        """
+        if not download or not result.documents:
+            return result
+
+        from .pipeline import ScraperPipeline
+        from .db import DocumentDB
+
+        db = DocumentDB()
+        db.ensure_table()
+
+        # Filter to only new documents
+        new_docs = []
+        for doc in result.documents:
+            if not db.exists(doc.source_url):
+                db.insert(doc)
+                new_docs.append(doc)
+            else:
+                doc.status = "skipped_duplicate"
+
+        if new_docs:
+            pipeline = ScraperPipeline(
+                download_dir=self.download_dir,
+                rate_limit=self.rate_limit,
+            )
+            sub = subdir or self.source_system
+            pipeline.process_batch(new_docs, subdir=sub)
+            pipeline.close()
+
+            # Update stats
+            result.stats["downloaded"] = pipeline.stats["downloaded"]
+            result.stats["skipped"] = pipeline.stats["skipped"]
+            result.stats["failed"] = pipeline.stats["failed"]
+            result.stats["bytes"] = pipeline.stats["bytes"]
+
+        return result
+
     # -- Abstract method ------------------------------------------------
 
     @abstractmethod
@@ -127,18 +172,31 @@ class BaseScraper(ABC):
     # -- CLI helpers ----------------------------------------------------
 
     @classmethod
-    def cli_run(cls, **kwargs):
-        """Entry point for `python scrapers/foo.py` standalone runs."""
+    def cli_run(cls, download: bool = True, **kwargs):
+        """Entry point for `python scrapers/foo.py` standalone runs.
+
+        Set download=False to skip automatic downloading (discovery only).
+        """
         scraper = cls(**{k: v for k, v in kwargs.items()
                         if k in ("download_dir", "rate_limit")})
         print(f"\n{'='*60}")
         print(f"  {scraper.display_name}")
         print(f"  Source: {scraper.source_system}")
+        print(f"  Auto-download: {'on' if download else 'off'}")
         print(f"{'='*60}\n")
 
         try:
-            result = scraper.run(**{k: v for k, v in kwargs.items()
-                                    if k not in ("download_dir", "rate_limit")})
+            run_kwargs = {k: v for k, v in kwargs.items()
+                         if k not in ("download_dir", "rate_limit", "download")}
+            result = scraper.run(**run_kwargs)
+            if download:
+                scraper.process_results(result, download=True)
+            scraper._print_result(result)
+        except Exception as e:
+            print(f"\n[FATAL] {e}")
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
             scraper._print_result(result)
         except Exception as e:
             print(f"\n[FATAL] {e}")

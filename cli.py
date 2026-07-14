@@ -343,6 +343,37 @@ class ScraperShell(cmd.Cmd):
             ))
         return docs
 
+
+    def do_sessions(self, arg: str):
+        """sessions — Show recent scrape session history."""
+        from scraper.core.session_tracker import SessionTracker
+        tracker = SessionTracker()
+        tracker.ensure_table()
+        recent = tracker.recent_sessions(limit=10)
+        stats = tracker.stats()
+
+        if self.console:
+            self.console.print(f"\n[bold]Recent Sessions[/] ({stats['total_sessions']} total)")
+            table = Table(box=box.SIMPLE)
+            table.add_column("Scraper", style="cyan")
+            table.add_column("Started")
+            table.add_column("Docs", justify="right")
+            table.add_column("Status", style="green")
+            for s in recent:
+                started = s["started_at"][:16] if s.get("started_at") else "?"
+                docs = f"{s.get('documents_found', 0)} found / {s.get('documents_down', 0)} down"
+                table.add_row(s["scraper_name"], started, docs, s["status"])
+            self.console.print(table)
+        else:
+            print(f"\nRecent Sessions ({stats['total_sessions']} total):")
+            print(f"{'Scraper':<25} {'Started':<18} {'Docs':<20} Status")
+            print("-" * 80)
+            for s in recent:
+                started = s["started_at"][:16] if s.get("started_at") else "?"
+                docs = f"{s.get('documents_found', 0)}f/{s.get('documents_down', 0)}d"
+                print(f"{s['scraper_name']:<25} {started:<18} {docs:<20} {s['status']}")
+        tracker.close()
+
     def do_strategies(self, arg: str):
         """strategies [platform] — Browse learned scraping strategies."""
         if arg:

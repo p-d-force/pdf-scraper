@@ -8,3 +8,5 @@ from .db import DocumentDB
 from .ftp import FTPUploader
 from .strategy import StrategyStore
 from .pipeline import ScraperPipeline
+from .playwright_scraper import PlaywrightScraper, PLAYWRIGHT_AVAILABLE
+from .session_tracker import SessionTracker
